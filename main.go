@@ -1,13 +1,12 @@
 package main
 
 import (
-	"net/http"
+	"log"
+	"os"
 
 	"telegram-bridge/config"
-	"telegram-bridge/handlers"
 	"telegram-bridge/logger"
-	"telegram-bridge/router"
-	"telegram-bridge/telegram"
+	"telegram-bridge/server"
 )
 
 func main() {
@@ -15,7 +14,7 @@ func main() {
 	cfg := config.Load()
 
 	// Initialize logger
-	logCfg := &logger.Config{
+	logInstance, err := logger.New("telegram-bridge", &logger.Config{
 		Level:      cfg.LogLevel,
 		LogDir:     cfg.LogDir,
 		MaxSize:    cfg.LogMaxSize,
@@ -23,34 +22,28 @@ func main() {
 		MaxAge:     cfg.LogMaxAge,
 		Compress:   cfg.LogCompress,
 		Console:    cfg.LogConsole,
-	}
-
-	log, err := logger.New("telegram-bridge", logCfg)
+	})
 	if err != nil {
-		panic("Failed to initialize logger: " + err.Error())
+		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	defer log.Sync()
+	defer logInstance.Sync()
 
-	// Initialize dependencies
-	telegramClient := telegram.NewClient(log)
-	handler := handlers.NewHandler(telegramClient, log)
+	// Set global logger
+	logger.SetGlobal(logInstance)
 
-	// Setup routes
-	mux := router.SetupRoutes(handler, cfg.AuthToken, log)
+	logInstance.Info("Starting Telegram Bridge Server")
 
-	// Log startup information
-	log.Info("Starting Telegram API Bridge",
+	// Initialize and start TCP server
+	tcpServer := server.NewTCPServer(cfg, logInstance)
+
+	logInstance.Info("Server configuration",
 		logger.String("port", cfg.Port),
-		logger.String("log_level", cfg.LogLevel))
-	log.Info("Available endpoints",
-		logger.Strings("endpoints", []string{
-			"POST /send - Send message to Telegram",
-			"GET /health - Health check",
-		}))
+		logger.String("log_level", cfg.LogLevel),
+		logger.String("log_dir", cfg.LogDir))
 
-	// Start server
-	log.Info("Server listening", logger.String("port", cfg.Port))
-	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
-		log.Fatal("Server failed to start", logger.ZError(err))
+	// Start the server (blocking call)
+	if err := tcpServer.Start(); err != nil {
+		logInstance.Fatal("Failed to start TCP server", logger.String("error", err.Error()))
+		os.Exit(1)
 	}
 }

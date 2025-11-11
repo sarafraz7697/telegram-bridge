@@ -1,9 +1,7 @@
 package config
 
 const (
-	// DefaultAuthToken for API requests (fallback only)
-	DefaultAuthToken = ""
-	// DefaultPort for the HTTP server
+	// DefaultPort for the TCP server
 	DefaultPort = "8080"
 )
 
@@ -11,7 +9,7 @@ const (
 type Config struct {
 	// Server
 	Port      string
-	AuthToken string
+	JWTSecret string
 
 	// Logging
 	LogLevel      string
@@ -31,7 +29,7 @@ func Load() *Config {
 	cfg := &Config{
 		// Server
 		Port:      GetEnv("PORT", DefaultPort),
-		AuthToken: GetEnv("AUTH_TOKEN", DefaultAuthToken),
+		JWTSecret: MustGetEnv("JWT_SECRET"),
 
 		// Logging
 		LogLevel:      GetEnv("LOG_LEVEL", "info"),

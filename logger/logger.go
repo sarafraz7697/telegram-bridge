@@ -209,6 +209,11 @@ func InitGlobal(name string, cfg *Config) error {
 	return nil
 }
 
+// SetGlobal sets the global logger instance
+func SetGlobal(logger Logger) {
+	globalLogger = logger
+}
+
 // Global returns the global logger instance
 func Global() Logger {
 	if globalLogger == nil {

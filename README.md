@@ -1,219 +1,171 @@
-# Telegram API Bridge
+# Telegram Bridge Server
 
-A clean, maintainable Go service for sending messages to Telegram users via Bot API.
+A dynamic TCP server that acts as a bridge to send Telegram messages. The server accepts requests with JWT authentication and dynamically creates Telegram bot instances based on the bot token provided in each request.
 
 ## Features
 
-- Send messages to single or multiple Telegram users/chats
-- Concurrent message delivery for better performance
+- JWT token authentication for secure access
+- Dynamic Telegram bot token handling (no static bot token in config)
+- Support for sending text messages
+- Support for sending images (base64 encoded)
+- Support for sending images with captions
 - Structured logging with file rotation
-- Environment-based configuration
-- Clean architecture with separated concerns
-- Health check endpoint
+- Multiple user targeting per request
+
+## Setup
+
+### 1. Environment Configuration
+
+Create a `.env` file based on `.env.example`:
+
+```bash
+PORT=8080
+JWT_SECRET=your-secure-jwt-secret-key-here
+LOG_LEVEL=info
+```
+
+### 2. Build and Run
+
+```bash
+go build
+./telegram-bridge
+```
+
+## API Usage
+
+### Request Format
+
+Connect to the TCP server and send JSON requests in the following format:
+
+#### Text Message
+```json
+{
+  "JWT": "your-jwt-token",
+  "TELEGRAM_BOT_TOKEN": "bot-token-from-telegram-botfather",
+  "USER_IDS": [123456789, 987654321],
+  "MESSAGE": "Hello from the bridge!",
+  "TYPE": "message"
+}
+```
+
+#### Image Only
+```json
+{
+  "JWT": "your-jwt-token",
+  "TELEGRAM_BOT_TOKEN": "bot-token-from-telegram-botfather",
+  "USER_IDS": [123456789],
+  "IMAGE_BASE64": "base64-encoded-image-data",
+  "TYPE": "image"
+}
+```
+
+#### Image with Caption
+```json
+{
+  "JWT": "your-jwt-token",
+  "TELEGRAM_BOT_TOKEN": "bot-token-from-telegram-botfather",
+  "USER_IDS": [123456789],
+  "MESSAGE": "Check out this image!",
+  "IMAGE_BASE64": "base64-encoded-image-data",
+  "TYPE": "image_and_message"
+}
+```
+
+### Response Format
+
+```json
+{
+  "success": true,
+  "message": "Message sent successfully",
+  "error": ""
+}
+```
+
+## JWT Token Generation
+
+You can generate JWT tokens using various methods. Here's an example using Go:
+
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+    "github.com/golang-jwt/jwt/v5"
+)
+
+func main() {
+    secret := "your-jwt-secret"
+
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+        "exp": time.Now().Add(time.Hour * 24 * 30).Unix(), // 30 days
+        "iat": time.Now().Unix(),
+    })
+
+    tokenString, err := token.SignedString([]byte(secret))
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Println(tokenString)
+}
+```
+
+Or using online tools like [jwt.io](https://jwt.io) with your JWT_SECRET.
+
+## Testing
+
+### Using netcat (Linux/Mac)
+```bash
+echo '{"JWT":"your-jwt-token","TELEGRAM_BOT_TOKEN":"your-bot-token","USER_IDS":[123456789],"MESSAGE":"Test message","TYPE":"message"}' | nc localhost 8080
+```
+
+### Using PowerShell (Windows)
+```powershell
+$json = '{"JWT":"your-jwt-token","TELEGRAM_BOT_TOKEN":"your-bot-token","USER_IDS":[123456789],"MESSAGE":"Test message","TYPE":"message"}'
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($json + "`n")
+$client = New-Object System.Net.Sockets.TcpClient("localhost", 8080)
+$stream = $client.GetStream()
+$stream.Write($bytes, 0, $bytes.Length)
+$reader = New-Object System.IO.StreamReader($stream)
+$response = $reader.ReadLine()
+Write-Host $response
+$client.Close()
+```
 
 ## Project Structure
 
 ```
 telegram-bridge/
-├── main.go                    # Application entry point
-├── .env.example              # Environment variables template
-├── config/
-│   └── config.go             # Configuration management
-├── models/
-│   └── models.go             # Request/response models
-├── telegram/
-│   └── client.go             # Telegram API client
-├── middleware/
-│   └── auth.go               # Authentication middleware
-├── handlers/
-│   └── handlers.go           # HTTP request handlers
-├── router/
-│   └── router.go             # Route configuration
-└── logger/
-    └── logger.go             # Structured logging
+├── config/          # Configuration management
+│   ├── config.go    # Config struct and loader
+│   └── env.go       # Environment variable utilities
+├── logger/          # Logging system
+│   └── logger.go    # Structured logger with rotation
+├── server/          # TCP server
+│   └── server.go    # Server implementation with JWT validation
+├── telegram/        # Telegram API integration
+│   └── telegram.go  # Dynamic bot service
+├── main.go          # Application entry point
+├── .env.example     # Environment variables template
+└── README.md        # Documentation
 ```
 
-## Setup
+## Security Notes
 
-### 1. Install Dependencies
+- Keep your JWT_SECRET secure and never commit it to version control
+- Use strong, randomly generated JWT secrets
+- Telegram bot tokens are never stored on the server
+- All requests are validated with JWT before processing
+- Failed authentication attempts are logged
 
-```bash
-go mod download
-```
+## Error Handling
 
-### 2. Configure Environment
+The server returns detailed error messages:
+- Invalid JWT token
+- Missing required fields
+- Invalid message type
+- Telegram API errors
+- Base64 decoding errors
 
-Copy the example environment file and configure it:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your settings:
-
-```env
-# Server Configuration
-PORT=8080
-
-# Authentication
-AUTH_TOKEN=your-secret-auth-token-here
-
-# Logging Configuration
-LOG_LEVEL=info
-LOG_DIR=./logs
-LOG_MAX_SIZE=100
-LOG_MAX_BACKUPS=5
-LOG_MAX_AGE=30
-LOG_COMPRESS=true
-LOG_CONSOLE=true
-```
-
-### 3. Run the Service
-
-```bash
-go run main.go
-```
-
-Or build and run:
-
-```bash
-go build -o telegram-bridge
-./telegram-bridge
-```
-
-## API Endpoints
-
-### POST /send
-
-Send messages to Telegram users/chats.
-
-**Headers:**
-```
-Authorization: Bearer <your-auth-token>
-Content-Type: application/json
-```
-
-**Request Body:**
-
-Option 1 - Single chat:
-```json
-{
-  "bot_token": "your-telegram-bot-token",
-  "message": "Hello from Telegram Bridge!",
-  "chat_id": "123456789"
-}
-```
-
-Option 2 - Multiple users:
-```json
-{
-  "bot_token": "your-telegram-bot-token",
-  "message": "Hello from Telegram Bridge!",
-  "user_ids": ["123456789", "987654321"]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "total_sent": 2,
-  "success_count": 2,
-  "fail_count": 0
-}
-```
-
-### GET /health
-
-Health check endpoint (no authentication required).
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "telegram-api-bridge"
-}
-```
-
-## Configuration Options
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | HTTP server port |
-| `AUTH_TOKEN` | (default token) | API authentication token |
-| `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
-| `LOG_DIR` | `./logs` | Directory for log files |
-| `LOG_MAX_SIZE` | `100` | Max log file size in MB |
-| `LOG_MAX_BACKUPS` | `5` | Max number of old log files to keep |
-| `LOG_MAX_AGE` | `30` | Max days to retain old log files |
-| `LOG_COMPRESS` | `true` | Compress rotated log files |
-| `LOG_CONSOLE` | `true` | Enable console logging |
-
-## Example Usage
-
-### cURL
-
-```bash
-curl -X POST http://localhost:8080/send \
-  -H "Authorization: Bearer your-auth-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "bot_token": "your-bot-token",
-    "message": "Test message",
-    "chat_id": "123456789"
-  }'
-```
-
-### Python
-
-```python
-import requests
-
-url = "http://localhost:8080/send"
-headers = {
-    "Authorization": "Bearer your-auth-token",
-    "Content-Type": "application/json"
-}
-data = {
-    "bot_token": "your-bot-token",
-    "message": "Test message",
-    "user_ids": ["123456789", "987654321"]
-}
-
-response = requests.post(url, json=data, headers=headers)
-print(response.json())
-```
-
-## Development
-
-### Run Tests
-
-```bash
-go test ./...
-```
-
-### Build
-
-```bash
-go build -o telegram-bridge
-```
-
-### Docker (Optional)
-
-```dockerfile
-FROM golang:1.21-alpine AS builder
-WORKDIR /app
-COPY . .
-RUN go mod download
-RUN go build -o telegram-bridge
-
-FROM alpine:latest
-RUN apk --no-cache add ca-certificates
-WORKDIR /root/
-COPY --from=builder /app/telegram-bridge .
-CMD ["./telegram-bridge"]
-```
-
-## License
-
-MIT
+All errors are logged for audit purposes.

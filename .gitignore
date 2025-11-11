@@ -1,35 +1,20 @@
-# Binaries
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-telegram-bridge
-telegram-bridge.exe
-/logs/*
-# Test binary
-*.test
-
-# Output of the go coverage tool
-*.out
-
-# Go workspace file
-go.work
-
-# Environment files
+go.sum
 .env
-
-# Logs
+data/
 logs/
-*.log
-
-# IDE
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
+
+# Backup files
+*.bak
+*_old.go
+postgres_storage_old.go
+*.exe
