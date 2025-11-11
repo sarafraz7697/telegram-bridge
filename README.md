@@ -83,7 +83,39 @@ Connect to the TCP server and send JSON requests in the following format:
 
 ## JWT Token Generation
 
-You can generate JWT tokens using various methods. Here's an example using Go:
+### Using the CLI Tool (Recommended)
+
+The project includes a built-in JWT token generator that automatically reads the `JWT_SECRET` from your `.env` file:
+
+```bash
+# Build the JWT generator
+go build -o jwt-gen ./cmd/jwt-gen
+
+# Generate a token with no expiration
+./jwt-gen
+
+# Generate a token that expires in 24 hours
+./jwt-gen -expires 24h
+
+# Generate a token that expires in 7 days
+./jwt-gen -expires 168h
+
+# Generate a token with a custom subject
+./jwt-gen -subject "my-app" -expires 30d
+
+# Show help
+./jwt-gen -help
+```
+
+The CLI tool will:
+- Automatically load `JWT_SECRET` from your `.env` file
+- Generate a properly signed JWT token
+- Display token details including expiration time
+- Support custom claims (subject, issuer)
+
+### Manual Generation
+
+Alternatively, you can generate JWT tokens manually using Go:
 
 ```go
 package main
@@ -137,6 +169,9 @@ $client.Close()
 
 ```
 telegram-bridge/
+├── cmd/             # Command-line tools
+│   └── jwt-gen/     # JWT token generator CLI
+│       └── main.go
 ├── config/          # Configuration management
 │   ├── config.go    # Config struct and loader
 │   └── env.go       # Environment variable utilities

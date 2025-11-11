@@ -7,20 +7,21 @@ import (
 	"net"
 	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	"telegram-bridge/config"
 	"telegram-bridge/logger"
 	"telegram-bridge/telegram"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // BridgeRequest represents the incoming request structure
 type BridgeRequest struct {
-	JWT              string   `json:"JWT"`
-	TelegramBotToken string   `json:"TELEGRAM_BOT_TOKEN"`
-	UserIDs          []int64  `json:"USER_IDS"`
-	Message          string   `json:"MESSAGE"`
-	ImageBase64      string   `json:"IMAGE_BASE64,omitempty"`
-	Type             string   `json:"TYPE"` // "message", "image", "image_and_message"
+	JWT              string  `json:"JWT"`
+	TelegramBotToken string  `json:"TELEGRAM_BOT_TOKEN"`
+	UserIDs          []int64 `json:"USER_IDS"`
+	Message          string  `json:"MESSAGE"`
+	ImageBase64      string  `json:"IMAGE_BASE64,omitempty"`
+	Type             string  `json:"TYPE"` // "message", "image", "image_and_message"
 }
 
 // Response represents the response structure
